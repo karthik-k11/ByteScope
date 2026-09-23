@@ -202,3 +202,16 @@ It does not:
 - Modify original files
 - Delete files
 - Upload files to external services
+
+## Current Status
+
+ByteScope Basic version is under development.
+
+Future phases may include:
+
+- Entropy analysis
+- Embedded signature detection
+- Binary comparison
+- String extraction
+- Format-specific parsing
+- Analysis history
