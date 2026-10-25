@@ -19,3 +19,13 @@ def test_unknown_file(tmp_path):
     test_file.write_bytes(b"ByteScope")
 
     assert detect_file_type(test_file) == "Unknown"
+
+
+def test_empty_zip_and_riff_subtypes_are_identified(tmp_path):
+    test_file = tmp_path / "empty.zip"
+    test_file.write_bytes(b"PK\x05\x06" + b"\x00" * 18)
+    assert detect_file_type(test_file) == "ZIP"
+
+    webp_file = tmp_path / "image.bin"
+    webp_file.write_bytes(b"RIFF" + b"\x00" * 4 + b"WEBP")
+    assert detect_file_type(webp_file) == "WEBP"
