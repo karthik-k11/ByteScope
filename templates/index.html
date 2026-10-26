@@ -1,152 +1,162 @@
-* {
-    box-sizing: border-box;
-}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101418">
+    <title>ByteScope — Binary file workbench</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="{{ url_for('index') }}" aria-label="ByteScope home">
+            <span class="brand-mark">B<span>.</span></span>
+            <span>ByteScope <small>LOCAL FILE WORKBENCH</small></span>
+        </a>
+        <div class="local-indicator"><span></span> Processing stays on this device</div>
+    </header>
 
-body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: #111315;
-    color: #e8e8e8;
-}
+    <main class="shell">
+        <section class="intro">
+            <div>
+                <p class="eyebrow">BINARY FILE FORENSICS</p>
+                <h1>Inspect the bytes.<br><span>Understand the file.</span></h1>
+                <p class="intro-copy">A lightweight, local-first workbench for metadata, signatures, structure, and byte-level comparison.</p>
+            </div>
+            <div class="intro-index"><span>01</span><span>ANALYZE / COMPARE / EXPORT</span></div>
+        </section>
 
-.container {
-    width: 90%;
-    max-width: 1200px;
-    margin: 40px auto;
-}
+        {% if error %}
+        <div class="alert" role="alert"><strong>Could not complete the request</strong><span>{{ error }}</span></div>
+        {% endif %}
 
-.header {
-    margin-bottom: 30px;
-}
+        <section class="tool-grid" aria-label="File tools">
+            <article class="panel upload-panel">
+                <div class="panel-heading">
+                    <div><p class="eyebrow">SINGLE FILE</p><h2>Analyze a file</h2></div>
+                    <span class="step">01</span>
+                </div>
+                <p class="muted">Inspect format indicators, calculate hashes, and browse a bounded hex preview.</p>
+                <form action="{{ url_for('analyze') }}" method="post" enctype="multipart/form-data">
+                    <label class="file-input"><span>Select a file</span><input type="file" name="file" required></label>
+                    <p class="fine-print">Maximum 64 MiB per request. Original files are not retained.</p>
+                    <button type="submit">Analyze file <span aria-hidden="true">→</span></button>
+                </form>
+            </article>
 
-.header h1 {
-    margin-bottom: 6px;
-    font-size: 32px;
-}
+            <article class="panel compare-panel">
+                <div class="panel-heading">
+                    <div><p class="eyebrow">BYTEWISE CHECK</p><h2>Compare two files</h2></div>
+                    <span class="step">02</span>
+                </div>
+                <p class="muted">Compare byte positions without modifying either input. Up to 100 differing offsets are listed.</p>
+                <form action="{{ url_for('compare') }}" method="post" enctype="multipart/form-data">
+                    <label class="file-input compact"><span>First file</span><input type="file" name="first_file" required></label>
+                    <label class="file-input compact"><span>Second file</span><input type="file" name="second_file" required></label>
+                    <button type="submit" class="secondary-button">Compare files <span aria-hidden="true">→</span></button>
+                </form>
+            </article>
+        </section>
 
-.header p {
-    margin: 0;
-    color: #9da3aa;
-}
+        {% if report %}
+        <section class="results" aria-labelledby="report-title">
+            <div class="results-head">
+                <div><p class="eyebrow">ANALYSIS REPORT</p><h2 id="report-title">{{ report.name }}</h2></div>
+                <a class="text-link" href="{{ url_for('export_report', analysis_id=report_id) }}">Download JSON <span aria-hidden="true">↗</span></a>
+            </div>
+            <div class="summary-grid">
+                <div class="summary-card"><span class="label">DETECTED FORMAT</span><strong>{{ report.detected_type }}</strong><small>{{ report.metadata.mime_type }}</small></div>
+                <div class="summary-card"><span class="label">FILE SIZE</span><strong>{{ "{:,}".format(report.size) }} <small>bytes</small></strong><small>{{ report.extension or "No extension" }}</small></div>
+                <div class="summary-card"><span class="label">EXTENSION CHECK</span><strong class="{{ 'good' if report.extension_matches else 'warning' }}">{{ "Consistent" if report.extension_matches else "Mismatch" }}</strong><small>{{ "No known conflict" if report.extension_matches else "Name and signature differ" }}</small></div>
+                <div class="summary-card"><span class="label">SHANNON ENTROPY</span><strong>{{ report.entropy }} <small>/ 8 bits</small></strong><div class="entropy-track"><span style="width: {{ (report.entropy / 8 * 100)|round(1) }}%"></span></div></div>
+            </div>
+            <div class="detail-grid">
+                <article class="panel">
+                    <div class="panel-heading"><div><p class="eyebrow">FILE IDENTITY</p><h3>Metadata & fingerprints</h3></div></div>
+                    <dl class="metadata-list">
+                        <div><dt>Magic bytes</dt><dd class="mono">{{ report.metadata.magic_bytes or "Empty file" }}</dd></div>
+                        <div><dt>Last modified (UTC)</dt><dd>{{ report.metadata.modified_utc }}</dd></div>
+                        <div><dt>MD5</dt><dd class="mono hash-value">{{ report.md5 }}</dd></div>
+                        <div><dt>SHA-256</dt><dd class="mono hash-value">{{ report.sha256 }}</dd></div>
+                    </dl>
+                </article>
+                <article class="panel">
+                    <div class="panel-heading"><div><p class="eyebrow">INTEGRITY SIGNALS</p><h3>Corruption indicators</h3></div></div>
+                    {% if report.corruption_indicators %}
+                    <ul class="issue-list">{% for issue in report.corruption_indicators %}<li>{{ issue }}</li>{% endfor %}</ul>
+                    {% else %}
+                    <p class="status-line"><span class="status-dot"></span>No known structural warning detected.</p>
+                    {% endif %}
+                    <p class="fine-print">Heuristic format checks are not a full validity or malware assessment.</p>
+                </article>
+            </div>
 
-.upload-box {
-    background: #191c20;
-    border: 1px solid #30343a;
-    padding: 24px;
-    border-radius: 8px;
-    margin-bottom: 25px;
-}
+            {% if report.structures %}
+            <article class="panel section-panel">
+                <div class="panel-heading"><div><p class="eyebrow">FORMAT-AWARE VIEW</p><h3>Structure inspection</h3></div></div>
+                {% if report.structures.PNG %}
+                <p class="muted">PNG chunks and CRC checksums</p>
+                <div class="table-wrap"><table><thead><tr><th>Chunk</th><th>Data length</th><th>CRC</th></tr></thead><tbody>
+                    {% for chunk in report.structures.PNG.chunks %}<tr><td class="mono">{{ chunk.type }}</td><td>{{ "{:,}".format(chunk.length) }} bytes</td><td class="{{ 'good' if chunk.crc_valid else 'warning' }}">{{ "Valid" if chunk.crc_valid else "Mismatch" }}</td></tr>{% endfor %}
+                </tbody></table></div>
+                {% endif %}
+                {% if report.structures.PDF %}
+                <div class="stat-strip"><span>PDF version <strong>{{ report.structures.PDF.version }}</strong></span><span>Objects <strong>{{ report.structures.PDF.objects }}</strong></span><span>Page markers <strong>{{ report.structures.PDF.pages }}</strong></span></div>
+                {% endif %}
+                {% if report.structures.ZIP %}
+                <p class="muted">Central-directory entries only; archive contents are never extracted.</p>
+                <div class="table-wrap"><table><thead><tr><th>Entry</th><th>Size</th><th>Compressed</th><th>Encrypted</th></tr></thead><tbody>
+                    {% for entry in report.structures.ZIP.entries %}<tr><td class="mono">{{ entry.name }}</td><td>{{ "{:,}".format(entry.size) }}</td><td>{{ "{:,}".format(entry.compressed_size) }}</td><td>{{ "Yes" if entry.encrypted else "No" }}</td></tr>{% else %}<tr><td colspan="4">No readable entries</td></tr>{% endfor %}
+                </tbody></table></div>
+                {% endif %}
+            </article>
+            {% endif %}
 
-input[type="file"] {
-    margin-right: 12px;
-}
+            <div class="detail-grid">
+                <article class="panel">
+                    <div class="panel-heading"><div><p class="eyebrow">SIGNATURE SCAN</p><h3>Embedded signatures <span class="count">{{ report.embedded_signatures|length }}</span></h3></div></div>
+                    {% if report.embedded_signatures %}
+                    <p class="fine-print">Offsets are potential carving boundaries only; no data is extracted.</p>
+                    {% if report.embedded_signatures_truncated %}<p class="fine-print">Signature results capped at 250 findings.</p>{% endif %}
+                    <div class="table-wrap"><table><thead><tr><th>Type</th><th>Offset</th><th>Estimated span</th></tr></thead><tbody>
+                        {% for item in report.carving_candidates %}<tr><td>{{ item.type }}</td><td class="mono">0x{{ "%X"|format(item.offset) }}</td><td>{{ "{:,}".format(item.estimated_size) }} bytes</td></tr>{% endfor %}
+                    </tbody></table></div>
+                    {% else %}<p class="muted">No known embedded signatures found after the file header.</p>{% endif %}
+                </article>
+                <article class="panel">
+                    <div class="panel-heading"><div><p class="eyebrow">PRINTABLE CONTENT</p><h3>ASCII strings <span class="count">{{ report.strings|length }}</span></h3></div></div>
+                    <div class="string-list">{% for string in report.strings %}<code>{{ string }}</code>{% else %}<span class="muted">No printable strings of four or more characters found.</span>{% endfor %}</div>
+                    {% if report.strings_truncated %}<p class="fine-print">Display capped at 300 strings.</p>{% endif %}
+                </article>
+            </div>
 
-button {
-    background: #e6e6e6;
-    color: #111315;
-    border: none;
-    padding: 10px 18px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-weight: 600;
-}
+            <article class="panel section-panel">
+                <div class="panel-heading"><div><p class="eyebrow">FIRST 256 BYTES</p><h3>Hex viewer</h3></div><span class="fine-print">Offset · Hex · ASCII</span></div>
+                <div class="hex-view"><div class="hex-head"><span>OFFSET</span><span>HEX BYTES</span><span>ASCII</span></div>
+                    {% for row in report.hex_preview %}<div class="hex-row"><span class="offset">{{ row.offset }}</span><code>{{ row.hex }}</code><code class="ascii">{{ row.ascii }}</code></div>{% else %}<p class="muted">This file is empty.</p>{% endfor %}
+                </div>
+            </article>
+        </section>
+        {% endif %}
 
-button:hover {
-    opacity: 0.85;
-}
+        {% if comparison %}
+        <section class="panel comparison-result">
+            <div class="panel-heading"><div><p class="eyebrow">COMPARISON RESULT</p><h2>{{ "Files are byte-for-byte identical" if comparison.equal else "Differences found" }}</h2></div><span class="compare-badge {{ 'good-bg' if comparison.equal else 'warn-bg' }}">{{ "IDENTICAL" if comparison.equal else "DIFFERENT" }}</span></div>
+            <div class="stat-strip"><span>{{ comparison.first_name }} <strong>{{ "{:,}".format(comparison.first_size) }} bytes</strong></span><span>{{ comparison.second_name }} <strong>{{ "{:,}".format(comparison.second_size) }} bytes</strong></span><span>Different positions <strong>{{ "{:,}".format(comparison.different_bytes) }}</strong></span></div>
+            {% if comparison.first_differing_offsets %}<p class="fine-print">First differing byte offsets (hex):</p><p class="offset-list mono">{% for offset in comparison.first_differing_offsets %}{{ "0x%X"|format(offset) }}{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+            {% if comparison.offsets_truncated %}<p class="fine-print">Offset display capped at 100 entries.</p>{% endif %}
+        </section>
+        {% endif %}
 
-.error {
-    background: #2a1b1b;
-    border: 1px solid #6b3030;
-    padding: 14px;
-    border-radius: 6px;
-    margin-bottom: 20px;
-}
-
-.section {
-    background: #191c20;
-    border: 1px solid #30343a;
-    border-radius: 8px;
-    padding: 22px;
-    margin-bottom: 20px;
-}
-
-.section h2 {
-    margin-top: 0;
-    font-size: 19px;
-}
-
-.info-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-}
-
-.info-card {
-    background: #111315;
-    border: 1px solid #292d32;
-    padding: 16px;
-    border-radius: 6px;
-}
-
-.label {
-    display: block;
-    color: #8f969d;
-    font-size: 13px;
-    margin-bottom: 7px;
-}
-
-.value {
-    font-weight: 600;
-    word-break: break-word;
-}
-
-.hash {
-    background: #111315;
-    border: 1px solid #292d32;
-    padding: 14px;
-    margin-bottom: 10px;
-    border-radius: 6px;
-    word-break: break-all;
-    font-family: Consolas, monospace;
-}
-
-.hex-view {
-    overflow-x: auto;
-    background: #0d0f11;
-    border: 1px solid #292d32;
-    padding: 16px;
-    border-radius: 6px;
-}
-
-.hex-row {
-    display: grid;
-    grid-template-columns: 100px 1fr 180px;
-    gap: 15px;
-    font-family: Consolas, monospace;
-    font-size: 13px;
-    line-height: 1.8;
-    white-space: nowrap;
-}
-
-.offset {
-    color: #9da3aa;
-}
-
-.ascii {
-    color: #d5d5d5;
-}
-
-@media (max-width: 800px) {
-    .info-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .hex-row {
-        grid-template-columns: 90px 1fr;
-    }
-
-    .ascii {
-        display: none;
-    }
-}
+        <section class="panel history-panel">
+            <div class="panel-heading"><div><p class="eyebrow">LOCAL DATABASE</p><h2>Recent analyses</h2></div><span class="fine-print">Names, hashes, and reports only — uploaded bytes are temporary.</span></div>
+            {% if history %}
+            <div class="table-wrap"><table><thead><tr><th>File</th><th>Format</th><th>Size</th><th>Analyzed (UTC)</th><th></th></tr></thead><tbody>
+                {% for item in history %}<tr><td>{{ item.name }}</td><td>{{ item.detected_type }}</td><td>{{ "{:,}".format(item.size) }} bytes</td><td>{{ item.created_at[:19].replace("T", " ") }}</td><td><a class="text-link" href="{{ url_for('export_report', analysis_id=item.id) }}">JSON ↗</a></td></tr>{% endfor %}
+            </tbody></table></div>
+            {% else %}<p class="muted">No saved analyses yet. Reports are stored locally in the SQLite database.</p>{% endif %}
+        </section>
+        <footer><span>BYTESCOPE · LOCAL BY DESIGN</span><span>Files are treated as untrusted data. Never execute unknown content.</span></footer>
+    </main>
+</body>
+</html>

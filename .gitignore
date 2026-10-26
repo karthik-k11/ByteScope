@@ -3,4 +3,7 @@ __pycache__/
 *.pyc
 .env
 *.db
+*.sqlite
+*.sqlite3
+instance/
 uploads/
